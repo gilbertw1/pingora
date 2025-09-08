@@ -10,7 +10,7 @@ Pingora is battle tested as it has been serving more than 40 million Internet re
 ## Feature highlights
 * Async Rust: fast and reliable
 * HTTP 1/2 end to end proxy
-* TLS over OpenSSL, BoringSSL or rustls(experimental).
+* TLS over OpenSSL, BoringSSL, s2n-tls, or rustls(experimental).
 * gRPC and websocket proxying
 * Graceful reload
 * Customizable load balancing and failover strategies

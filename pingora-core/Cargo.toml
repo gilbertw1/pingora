@@ -27,6 +27,7 @@ pingora-error = { version = "0.5.0", path = "../pingora-error" }
 pingora-timeout = { version = "0.5.0", path = "../pingora-timeout" }
 pingora-http = { version = "0.5.0", path = "../pingora-http" }
 pingora-rustls = { version = "0.5.0", path = "../pingora-rustls", optional = true }
+pingora-s2n = { version = "0.5.0", path = "../pingora-s2n", optional = true }
 tokio = { workspace = true, features = ["net", "rt-multi-thread", "signal"] }
 futures = "0.3"
 async-trait = { workspace = true }
@@ -95,6 +96,7 @@ default = []
 openssl = ["pingora-openssl", "openssl_derived"]
 boringssl = ["pingora-boringssl", "openssl_derived"]
 rustls = ["pingora-rustls", "any_tls", "dep:x509-parser", "ouroboros"]
+s2n = ["pingora-s2n", "any_tls", "dep:x509-parser", "ouroboros"]
 patched_http1 = ["pingora-http/patched_http1"]
 openssl_derived = ["any_tls"]
 any_tls = []

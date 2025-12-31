@@ -23,10 +23,11 @@ pub mod tls;
 mod windows;
 
 pub use digest::{
-    Digest, GetProxyDigest, GetSocketDigest, GetTimingDigest, ProtoDigest, SocketDigest,
-    TimingDigest,
+    Digest, GetProxyDigest, GetProxyProtocolDigest, GetSocketDigest, GetTimingDigest, ProtoDigest,
+    ProxyProtocolDigest, SocketDigest, TimingDigest,
 };
 pub use l4::ext::TcpKeepalive;
+pub use l4::proxy_protocol::{ProxyProtocolHeader, ProxyProtocolVersion};
 pub use tls::ALPN;
 
 use async_trait::async_trait;
@@ -94,6 +95,7 @@ pub trait IO:
     + GetTimingDigest
     + GetProxyDigest
     + GetSocketDigest
+    + GetProxyProtocolDigest
     + Peek
     + Unpin
     + Debug
@@ -115,6 +117,7 @@ impl<
             + GetTimingDigest
             + GetProxyDigest
             + GetSocketDigest
+            + GetProxyProtocolDigest
             + Peek
             + Unpin
             + Debug
@@ -165,6 +168,11 @@ mod ext_io_impl {
             None
         }
     }
+    impl GetProxyProtocolDigest for Mock {
+        fn get_proxy_protocol_digest(&self) -> Option<Arc<ProxyProtocolDigest>> {
+            None
+        }
+    }
 
     impl Peek for Mock {}
 
@@ -192,6 +200,11 @@ mod ext_io_impl {
     }
     impl<T> GetSocketDigest for Cursor<T> {
         fn get_socket_digest(&self) -> Option<Arc<SocketDigest>> {
+            None
+        }
+    }
+    impl<T> GetProxyProtocolDigest for Cursor<T> {
+        fn get_proxy_protocol_digest(&self) -> Option<Arc<ProxyProtocolDigest>> {
             None
         }
     }
@@ -224,6 +237,11 @@ mod ext_io_impl {
             None
         }
     }
+    impl GetProxyProtocolDigest for DuplexStream {
+        fn get_proxy_protocol_digest(&self) -> Option<Arc<ProxyProtocolDigest>> {
+            None
+        }
+    }
 
     impl Peek for DuplexStream {}
 }
@@ -235,8 +253,9 @@ pub mod ext_test {
     use async_trait::async_trait;
 
     use super::{
-        raw_connect, GetProxyDigest, GetSocketDigest, GetTimingDigest, Peek, Shutdown,
-        SocketDigest, Ssl, TimingDigest, UniqueID, UniqueIDType,
+        raw_connect, GetProxyDigest, GetProxyProtocolDigest, GetSocketDigest, GetTimingDigest,
+        Peek, ProxyProtocolDigest, Shutdown, SocketDigest, Ssl, TimingDigest, UniqueID,
+        UniqueIDType,
     };
 
     #[async_trait]
@@ -261,6 +280,11 @@ pub mod ext_test {
     }
     impl GetSocketDigest for tokio::net::UnixStream {
         fn get_socket_digest(&self) -> Option<Arc<SocketDigest>> {
+            None
+        }
+    }
+    impl GetProxyProtocolDigest for tokio::net::UnixStream {
+        fn get_proxy_protocol_digest(&self) -> Option<Arc<ProxyProtocolDigest>> {
             None
         }
     }

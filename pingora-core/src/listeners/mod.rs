@@ -123,6 +123,7 @@ struct TransportStackBuilder {
     tls: Option<TlsSettings>,
     #[cfg(feature = "connection_filter")]
     connection_filter: Option<Arc<dyn ConnectionFilter>>,
+    proxy_protocol: bool,
 }
 
 impl TransportStackBuilder {
@@ -133,6 +134,7 @@ impl TransportStackBuilder {
         let mut builder = ListenerEndpoint::builder();
 
         builder.listen_addr(self.l4.clone());
+        builder.proxy_protocol(self.proxy_protocol);
 
         #[cfg(feature = "connection_filter")]
         if let Some(filter) = &self.connection_filter {
@@ -205,6 +207,7 @@ pub struct Listeners {
     stacks: Vec<TransportStackBuilder>,
     #[cfg(feature = "connection_filter")]
     connection_filter: Option<Arc<dyn ConnectionFilter>>,
+    proxy_protocol: bool,
 }
 
 impl Listeners {
@@ -214,6 +217,7 @@ impl Listeners {
             stacks: vec![],
             #[cfg(feature = "connection_filter")]
             connection_filter: None,
+            proxy_protocol: false,
         }
     }
     /// Create a new [`Listeners`] with a TCP server endpoint from the given string.
@@ -294,13 +298,35 @@ impl Listeners {
         }
     }
 
+    /// Enable or disable PROXY protocol parsing for all endpoints
+    ///
+    /// When enabled, Pingora will expect and parse PROXY protocol V1 or V2 headers
+    /// from incoming connections and make the original client address available
+    /// through the session's proxy protocol digest.
+    pub fn set_proxy_protocol(&mut self, enabled: bool) {
+        self.proxy_protocol = enabled;
+
+        // Apply to existing stacks
+        for stack in &mut self.stacks {
+            stack.proxy_protocol = enabled;
+        }
+    }
+
     /// Add the given [`ServerAddress`] to `self` with the given [`TlsSettings`] if provided
     pub fn add_endpoint(&mut self, l4: ServerAddress, tls: Option<TlsSettings>) {
+        // Check if proxy_protocol is set in TcpSocketOptions
+        let proxy_protocol = if let ServerAddress::Tcp(_, Some(ref opts)) = l4 {
+            opts.proxy_protocol.unwrap_or(self.proxy_protocol)
+        } else {
+            self.proxy_protocol
+        };
+
         self.stacks.push(TransportStackBuilder {
             l4,
             tls,
             #[cfg(feature = "connection_filter")]
             connection_filter: self.connection_filter.clone(),
+            proxy_protocol,
         })
     }
 

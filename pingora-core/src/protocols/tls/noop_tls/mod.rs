@@ -108,7 +108,8 @@ pub mod stream {
     use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
 
     use crate::protocols::{
-        GetProxyDigest, GetSocketDigest, GetTimingDigest, Peek, Shutdown, Ssl, UniqueID,
+        GetProxyDigest, GetProxyProtocolDigest, GetSocketDigest, GetTimingDigest, Peek, Shutdown,
+        Ssl, UniqueID,
     };
 
     /// A TLS session over a stream.
@@ -191,6 +192,14 @@ pub mod stream {
 
     impl<S> GetSocketDigest for SslStream<S> {
         fn get_socket_digest(&self) -> Option<std::sync::Arc<crate::protocols::SocketDigest>> {
+            None
+        }
+    }
+
+    impl<S> GetProxyProtocolDigest for SslStream<S> {
+        fn get_proxy_protocol_digest(
+            &self,
+        ) -> Option<std::sync::Arc<crate::protocols::digest::ProxyProtocolDigest>> {
             None
         }
     }

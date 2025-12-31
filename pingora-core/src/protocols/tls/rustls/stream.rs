@@ -20,10 +20,12 @@ use std::task::{Context, Poll};
 use std::time::{Duration, SystemTime};
 
 use crate::listeners::tls::Acceptor;
+use crate::protocols::digest::ProxyProtocolDigest;
 use crate::protocols::raw_connect::ProxyDigest;
 use crate::protocols::{tls::SslDigest, Peek, TimingDigest, UniqueIDType};
 use crate::protocols::{
-    GetProxyDigest, GetSocketDigest, GetTimingDigest, SocketDigest, Ssl, UniqueID, ALPN,
+    GetProxyDigest, GetProxyProtocolDigest, GetSocketDigest, GetTimingDigest, SocketDigest, Ssl,
+    UniqueID, ALPN,
 };
 use crate::utils::tls::get_organization_serial_bytes;
 use pingora_error::ErrorType::{AcceptError, ConnectError, InternalError, TLSHandshakeFailure};
@@ -126,6 +128,15 @@ where
 {
     fn get_proxy_digest(&self) -> Option<Arc<ProxyDigest>> {
         self.tls.get_proxy_digest()
+    }
+}
+
+impl<S> GetProxyProtocolDigest for TlsStream<S>
+where
+    S: GetProxyProtocolDigest,
+{
+    fn get_proxy_protocol_digest(&self) -> Option<Arc<ProxyProtocolDigest>> {
+        self.tls.get_proxy_protocol_digest()
     }
 }
 
@@ -354,6 +365,19 @@ where
     fn get_proxy_digest(&self) -> Option<Arc<ProxyDigest>> {
         if let Some(stream) = self.stream.as_ref() {
             stream.get_ref().0.get_proxy_digest()
+        } else {
+            None
+        }
+    }
+}
+
+impl<S> GetProxyProtocolDigest for InnerStream<S>
+where
+    S: GetProxyProtocolDigest,
+{
+    fn get_proxy_protocol_digest(&self) -> Option<Arc<ProxyProtocolDigest>> {
+        if let Some(stream) = self.stream.as_ref() {
+            stream.get_ref().0.get_proxy_protocol_digest()
         } else {
             None
         }

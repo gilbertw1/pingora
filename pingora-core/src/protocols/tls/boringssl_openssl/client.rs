@@ -14,10 +14,12 @@
 
 //! TLS client specific implementation
 
+use crate::protocols::digest::ProxyProtocolDigest;
 use crate::protocols::raw_connect::ProxyDigest;
 use crate::protocols::tls::SslStream;
 use crate::protocols::{
-    GetProxyDigest, GetSocketDigest, GetTimingDigest, SocketDigest, TimingDigest, IO,
+    GetProxyDigest, GetProxyProtocolDigest, GetSocketDigest, GetTimingDigest, SocketDigest,
+    TimingDigest, IO,
 };
 use crate::tls::{ssl, ssl::ConnectConfiguration, ssl::SslRef, ssl_sys::X509_V_ERR_INVALID_CALL};
 
@@ -121,5 +123,17 @@ where
     }
     fn set_socket_digest(&mut self, socket_digest: SocketDigest) {
         self.get_mut().set_socket_digest(socket_digest)
+    }
+}
+
+impl<S> GetProxyProtocolDigest for SslStream<S>
+where
+    S: GetProxyProtocolDigest,
+{
+    fn get_proxy_protocol_digest(&self) -> Option<Arc<ProxyProtocolDigest>> {
+        self.get_ref().get_proxy_protocol_digest()
+    }
+    fn set_proxy_protocol_digest(&mut self, digest: ProxyProtocolDigest) {
+        self.get_mut().set_proxy_protocol_digest(digest)
     }
 }

@@ -20,6 +20,7 @@ use std::time::{Duration, SystemTime};
 use once_cell::sync::OnceCell;
 
 use super::l4::ext::{get_original_dest, get_recv_buf, get_snd_buf, get_tcp_info, TCP_INFO};
+use super::l4::proxy_protocol::ProxyProtocolHeader;
 use super::l4::socket::SocketAddr;
 use super::raw_connect::ProxyDigest;
 use super::tls::digest::SslDigest;
@@ -35,6 +36,8 @@ pub struct Digest {
     pub proxy_digest: Option<Arc<ProxyDigest>>,
     /// Information about underlying socket/fd of this connection
     pub socket_digest: Option<Arc<SocketDigest>>,
+    /// Information from PROXY protocol header if present
+    pub proxy_protocol: Option<Arc<ProxyProtocolDigest>>,
 }
 
 /// The interface to return protocol related information
@@ -228,4 +231,58 @@ pub trait GetProxyDigest {
 pub trait GetSocketDigest {
     fn get_socket_digest(&self) -> Option<Arc<SocketDigest>>;
     fn set_socket_digest(&mut self, _socket_digest: SocketDigest) {}
+}
+
+/// Digest containing PROXY protocol information
+///
+/// This struct holds the parsed information from a PROXY protocol header,
+/// which is used by load balancers and proxies to pass original client
+/// connection information to backend servers.
+#[derive(Debug, Clone)]
+pub struct ProxyProtocolDigest {
+    /// The parsed PROXY protocol header
+    pub header: ProxyProtocolHeader,
+}
+
+impl ProxyProtocolDigest {
+    /// Create a new ProxyProtocolDigest from a parsed header
+    pub fn new(header: ProxyProtocolHeader) -> Self {
+        Self { header }
+    }
+
+    /// Get the original client address from the PROXY protocol header
+    pub fn client_addr(&self) -> Option<&SocketAddr> {
+        self.header.source_addr.as_ref()
+    }
+
+    /// Get the original destination address from the PROXY protocol header
+    pub fn dest_addr(&self) -> Option<&SocketAddr> {
+        self.header.dest_addr.as_ref()
+    }
+
+    /// Check if this is a LOCAL command (health check)
+    pub fn is_local(&self) -> bool {
+        self.header.is_local
+    }
+
+    /// Get the authority (SNI) from TLV if present (V2 only)
+    pub fn authority(&self) -> Option<&str> {
+        self.header.authority()
+    }
+
+    /// Get the ALPN from TLV if present (V2 only)
+    pub fn alpn(&self) -> Option<&[u8]> {
+        self.header.alpn()
+    }
+
+    /// Get the unique ID from TLV if present (V2 only)
+    pub fn unique_id(&self) -> Option<&[u8]> {
+        self.header.unique_id()
+    }
+}
+
+/// The interface to set or return PROXY protocol information
+pub trait GetProxyProtocolDigest {
+    fn get_proxy_protocol_digest(&self) -> Option<Arc<ProxyProtocolDigest>>;
+    fn set_proxy_protocol_digest(&mut self, _digest: ProxyProtocolDigest) {}
 }

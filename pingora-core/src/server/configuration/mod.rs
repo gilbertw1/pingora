@@ -116,6 +116,17 @@ pub struct ServerConf {
     /// The retry interval is 1 second between attempts.
     /// If not set, defaults to 5 retries.
     pub upgrade_sock_connect_accept_max_retries: Option<usize>,
+    /// Whether to expect and parse PROXY protocol headers on incoming connections.
+    ///
+    /// When enabled, Pingora will parse PROXY protocol V1 and V2 headers from
+    /// incoming connections and make the original client address available
+    /// through the session's proxy protocol digest.
+    ///
+    /// This should be enabled when Pingora is behind a load balancer or proxy
+    /// that sends PROXY protocol headers (e.g., HAProxy, AWS ELB/NLB).
+    ///
+    /// Default: `false`
+    pub proxy_protocol: bool,
 }
 
 impl Default for ServerConf {
@@ -144,6 +155,7 @@ impl Default for ServerConf {
             graceful_shutdown_timeout_seconds: None,
             max_retries: DEFAULT_MAX_RETRIES,
             upgrade_sock_connect_accept_max_retries: None,
+            proxy_protocol: false,
         }
     }
 }
@@ -311,6 +323,7 @@ mod tests {
             graceful_shutdown_timeout_seconds: None,
             max_retries: 1,
             upgrade_sock_connect_accept_max_retries: None,
+            proxy_protocol: false,
         };
         // cargo test -- --nocapture not_a_test_i_cannot_write_yaml_by_hand
         println!("{}", conf.to_yaml());

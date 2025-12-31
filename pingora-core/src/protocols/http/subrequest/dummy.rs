@@ -12,10 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::protocols::digest::ProxyProtocolDigest;
 use crate::protocols::raw_connect::ProxyDigest;
 use crate::protocols::{
-    GetProxyDigest, GetSocketDigest, GetTimingDigest, Peek, SocketDigest, Ssl, TimingDigest,
-    UniqueID, UniqueIDType,
+    GetProxyDigest, GetProxyProtocolDigest, GetSocketDigest, GetTimingDigest, Peek, SocketDigest,
+    Ssl, TimingDigest, UniqueID, UniqueIDType,
 };
 use async_trait::async_trait;
 use core::pin::Pin;
@@ -89,6 +90,12 @@ impl GetProxyDigest for DummyIO {
 
 impl GetSocketDigest for DummyIO {
     fn get_socket_digest(&self) -> Option<Arc<SocketDigest>> {
+        None
+    }
+}
+
+impl GetProxyProtocolDigest for DummyIO {
+    fn get_proxy_protocol_digest(&self) -> Option<Arc<ProxyProtocolDigest>> {
         None
     }
 }

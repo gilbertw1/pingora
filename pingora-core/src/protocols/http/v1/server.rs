@@ -99,6 +99,7 @@ impl HttpSession {
             timing_digest: underlying_stream.get_timing_digest(),
             proxy_digest: underlying_stream.get_proxy_digest(),
             socket_digest: underlying_stream.get_socket_digest(),
+            proxy_protocol: underlying_stream.get_proxy_protocol_digest(),
         });
 
         HttpSession {

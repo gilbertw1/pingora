@@ -754,6 +754,20 @@ impl Session {
         }
     }
 
+    /// Return the original client address from PROXY protocol header if present.
+    ///
+    /// This returns the source address from the PROXY protocol header, which represents
+    /// the original client address before any proxies. Returns `None` if no PROXY protocol
+    /// header was received or if the connection doesn't support it.
+    ///
+    /// Use this method when you need the true client IP behind load balancers or proxies
+    /// that send PROXY protocol headers.
+    pub fn proxy_protocol_client_addr(&self) -> Option<&SocketAddr> {
+        self.digest()
+            .and_then(|d| d.proxy_protocol.as_ref())
+            .and_then(|pp| pp.client_addr())
+    }
+
     /// Return the server (local) address of the connection.
     pub fn server_addr(&self) -> Option<&SocketAddr> {
         match self {

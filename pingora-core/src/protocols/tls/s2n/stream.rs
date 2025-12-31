@@ -12,12 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::protocols::digest::TimingDigest;
+use crate::protocols::digest::{ProxyProtocolDigest, TimingDigest};
 use crate::protocols::raw_connect::ProxyDigest;
 use crate::protocols::tls::SslDigest;
 use crate::protocols::{
-    GetProxyDigest, GetSocketDigest, GetTimingDigest, Peek, Shutdown, SocketDigest, Ssl, UniqueID,
-    UniqueIDType, ALPN,
+    GetProxyDigest, GetProxyProtocolDigest, GetSocketDigest, GetTimingDigest, Peek, Shutdown,
+    SocketDigest, Ssl, UniqueID, UniqueIDType, ALPN,
 };
 use crate::tls::TlsStream as S2NTlsStream;
 use crate::utils::tls::get_organization_serial_bytes;
@@ -276,6 +276,15 @@ where
 {
     fn get_proxy_digest(&self) -> Option<Arc<ProxyDigest>> {
         self.stream.get_ref().get_proxy_digest()
+    }
+}
+
+impl<S> GetProxyProtocolDigest for TlsStream<S>
+where
+    S: GetProxyProtocolDigest + AsyncRead + AsyncWrite + std::marker::Unpin,
+{
+    fn get_proxy_protocol_digest(&self) -> Option<Arc<ProxyProtocolDigest>> {
+        self.stream.get_ref().get_proxy_protocol_digest()
     }
 }
 

@@ -12,9 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-#[cfg(feature = "connection_filter")]
-use log::debug;
-use log::warn;
+use log::{debug, warn};
 use pingora_error::{
     ErrorType::{AcceptError, BindError},
     OrErr, Result,
@@ -38,10 +36,11 @@ use crate::listeners::AcceptAllFilter;
 
 use crate::protocols::l4::ext::{set_dscp, set_tcp_fastopen_backlog};
 use crate::protocols::l4::listener::Listener;
+use crate::protocols::l4::proxy_protocol;
 pub use crate::protocols::l4::stream::Stream;
 #[cfg(feature = "connection_filter")]
 use crate::protocols::GetSocketDigest;
-use crate::protocols::TcpKeepalive;
+use crate::protocols::{GetProxyProtocolDigest, ProxyProtocolDigest, TcpKeepalive};
 #[cfg(unix)]
 use crate::server::ListenFds;
 
@@ -99,6 +98,11 @@ pub struct TcpSocketOptions {
     /// This is useful for load balancing across multiple worker processes.
     /// See the [man page](https://man7.org/linux/man-pages/man7/socket.7.html) for more information.
     pub so_reuseport: Option<bool>,
+    /// Enable PROXY protocol parsing on incoming connections.
+    /// When enabled, Pingora will expect and parse PROXY protocol V1 or V2 headers
+    /// from incoming connections and make the original client address available
+    /// through the session's proxy protocol digest.
+    pub proxy_protocol: Option<bool>,
     // TODO: allow configuring reuseaddr, backlog, etc. from here?
 }
 
@@ -282,6 +286,7 @@ pub struct ListenerEndpoint {
     listener: Arc<Listener>,
     #[cfg(feature = "connection_filter")]
     connection_filter: Arc<dyn ConnectionFilter>,
+    proxy_protocol: bool,
 }
 
 #[derive(Default)]
@@ -289,6 +294,7 @@ pub struct ListenerEndpointBuilder {
     listen_addr: Option<ServerAddress>,
     #[cfg(feature = "connection_filter")]
     connection_filter: Option<Arc<dyn ConnectionFilter>>,
+    proxy_protocol: bool,
 }
 
 impl ListenerEndpointBuilder {
@@ -297,11 +303,24 @@ impl ListenerEndpointBuilder {
             listen_addr: None,
             #[cfg(feature = "connection_filter")]
             connection_filter: None,
+            proxy_protocol: false,
         }
     }
 
     pub fn listen_addr(&mut self, addr: ServerAddress) -> &mut Self {
+        // Extract proxy_protocol setting from TcpSocketOptions if present
+        if let ServerAddress::Tcp(_, Some(ref opts)) = addr {
+            if let Some(pp) = opts.proxy_protocol {
+                self.proxy_protocol = pp;
+            }
+        }
         self.listen_addr = Some(addr);
+        self
+    }
+
+    /// Enable or disable PROXY protocol parsing for this endpoint
+    pub fn proxy_protocol(&mut self, enabled: bool) -> &mut Self {
+        self.proxy_protocol = enabled;
         self
     }
 
@@ -346,6 +365,7 @@ impl ListenerEndpointBuilder {
             listener: Arc::new(listener),
             #[cfg(feature = "connection_filter")]
             connection_filter,
+            proxy_protocol: self.proxy_protocol,
         })
     }
 
@@ -367,6 +387,7 @@ impl ListenerEndpointBuilder {
             listener: Arc::new(listener),
             #[cfg(feature = "connection_filter")]
             connection_filter,
+            proxy_protocol: self.proxy_protocol,
         })
     }
 }
@@ -430,6 +451,12 @@ impl ListenerEndpoint {
                 }
 
                 self.apply_stream_settings(&mut stream)?;
+
+                // Parse PROXY protocol if enabled
+                if self.proxy_protocol {
+                    self.parse_proxy_protocol(&mut stream).await?;
+                }
+
                 return Ok(stream);
             }
         }
@@ -441,8 +468,40 @@ impl ListenerEndpoint {
                 .await
                 .or_err(AcceptError, "Fail to accept()")?;
             self.apply_stream_settings(&mut stream)?;
+
+            // Parse PROXY protocol if enabled
+            if self.proxy_protocol {
+                self.parse_proxy_protocol(&mut stream).await?;
+            }
+
             Ok(stream)
         }
+    }
+
+    /// Parse PROXY protocol header from the stream and store the digest
+    async fn parse_proxy_protocol(&self, stream: &mut Stream) -> Result<()> {
+        let (header, remaining) = proxy_protocol::read_proxy_protocol(stream).await?;
+
+        if let Some(header) = header {
+            debug!(
+                "Parsed PROXY protocol {:?} header: src={:?}, dst={:?}",
+                header.version, header.source_addr, header.dest_addr
+            );
+            stream.set_proxy_protocol_digest(ProxyProtocolDigest::new(header));
+        } else {
+            // No PROXY protocol header found - this is an error if proxy_protocol is enabled
+            return Err(pingora_error::Error::explain(
+                pingora_error::ErrorType::AcceptError,
+                "Expected PROXY protocol header but none found",
+            ));
+        }
+
+        // Rewind any remaining data that was read but not part of the header
+        if !remaining.is_empty() {
+            stream.rewind(&remaining);
+        }
+
+        Ok(())
     }
 }
 
